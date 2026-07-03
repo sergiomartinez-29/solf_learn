@@ -192,9 +192,9 @@ function drawStaff(note, clef){
   }
   // clave (Noto Music es SMuFL: font-size = altura del pentagrama, origen en su línea)
   if(clef==="treble")
-    parts.push(`<text class="clefglyph" x="${X0+14}" y="${BOT_Y-S}" font-size="${4*S}">𝄞</text>`);
+    parts.push(`<text class="clefglyph" x="${X0+14}" y="${BOT_Y + 0.35*S}" font-size="${4*S}">𝄞</text>`);
   else
-    parts.push(`<text class="clefglyph" x="${X0+14}" y="${BOT_Y-3*S}" font-size="${4*S}">𝄢</text>`);
+    parts.push(`<text class="clefglyph" x="${X0+14}" y="${BOT_Y - 0.6*S}" font-size="${4*S}">𝄢</text>`);
 
   if(note){
     const d=dia(note.letter,note.oct), y=yOf(d,clef);
