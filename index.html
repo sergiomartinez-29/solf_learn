@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solfeo al Piano</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Noto+Music&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FAF6EC;
+    --ink:#24211B;
+    --rule:#DCD3BE;
+    --pen:#C4402C;      /* rojo de corrección */
+    --ok:#2E7D4F;
+    --brass:#A8873C;
+    --card:#FFFDF7;
+    --shadow:0 2px 14px rgba(36,33,27,.10);
+    font-size:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+    color:var(--ink);
+    background:var(--paper);
+    /* pauta de fondo: papel pautado tenue */
+    background-image:repeating-linear-gradient(
+      to bottom, transparent 0 34px,
+      var(--rule) 34px 35px, transparent 35px 41px,
+      var(--rule) 41px 42px, transparent 42px 48px,
+      var(--rule) 48px 49px, transparent 49px 55px,
+      var(--rule) 55px 56px, transparent 56px 62px,
+      var(--rule) 62px 63px, transparent 63px 120px);
+    min-height:100vh;
+    display:flex;flex-direction:column;align-items:center;
+    padding:1rem;
+  }
+  header{width:100%;max-width:640px;display:flex;align-items:baseline;justify-content:space-between;margin:.4rem 0 1rem}
+  h1{font-family:"Fraunces",serif;font-weight:700;font-size:clamp(1.5rem,4vw,2rem);letter-spacing:-.02em}
+  h1 .clef{font-family:"Noto Music";font-weight:400;color:var(--pen)}
+  .tag{font-size:.8rem;color:#7a7263}
+
+  .card{
+    width:100%;max-width:640px;background:var(--card);
+    border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);
+    overflow:hidden;position:relative;
+  }
+  /* barra de tiempo */
+  #timebar{height:6px;background:#EFE9DA}
+  #timefill{height:100%;width:100%;background:var(--brass);transition:width .25s linear}
+
+  .hud{display:flex;justify-content:space-between;align-items:center;padding:.7rem 1rem;font-variant-numeric:tabular-nums}
+  .hud .stat{text-align:center}
+  .hud .num{font-family:"Fraunces",serif;font-size:1.5rem;font-weight:700;line-height:1}
+  .hud .lbl{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:#7a7263}
+  #timeleft.low{color:var(--pen)}
+  #hits{color:var(--ok)} #miss{color:var(--pen)}
+
+  #staffwrap{padding:.2rem .8rem 0}
+  svg{width:100%;height:auto;display:block}
+  .staffline{stroke:var(--ink);stroke-width:1.4}
+  .ledger{stroke:var(--ink);stroke-width:1.6}
+  .clefglyph{font-family:"Noto Music";fill:var(--ink)}
+  .notehead{fill:var(--ink)} .stem{stroke:var(--ink);stroke-width:2}
+  .flash-ok .notehead{fill:var(--ok)} .flash-ok .stem{stroke:var(--ok)}
+  .flash-bad .notehead{fill:var(--pen)} .flash-bad .stem{stroke:var(--pen)}
+
+  #feedback{
+    min-height:3.4rem;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:.1rem;padding:.3rem 1rem 1rem;text-align:center;
+  }
+  #detected{font-size:.85rem;color:#7a7263;min-height:1.2em}
+  #verdict{font-family:"Fraunces",serif;font-size:1.3rem;font-weight:700;min-height:1.4em}
+  #verdict.ok{color:var(--ok)} #verdict.bad{color:var(--pen)}
+
+  /* overlays */
+  .overlay{
+    position:absolute;inset:0;background:rgba(255,253,247,.96);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:1rem;padding:1.5rem;text-align:center;
+  }
+  .overlay h2{font-family:"Fraunces",serif;font-size:1.6rem}
+  .overlay p{font-size:.9rem;color:#5c5647;max-width:38ch}
+  .choices{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center}
+  .choice{
+    padding:.55rem 1rem;border:1.5px solid var(--ink);border-radius:999px;
+    background:transparent;font:inherit;font-size:.9rem;cursor:pointer;color:var(--ink)
+  }
+  .choice .clef{font-family:"Noto Music"}
+  .choice[aria-pressed="true"]{background:var(--ink);color:var(--card)}
+  .toggle{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:#5c5647;cursor:pointer}
+  .btn{
+    padding:.75rem 2.2rem;border:none;border-radius:999px;cursor:pointer;
+    background:var(--pen);color:#fff;font:inherit;font-size:1.05rem;font-weight:600;
+    box-shadow:var(--shadow)
+  }
+  .btn:hover{filter:brightness(1.06)}
+  :focus-visible{outline:2.5px solid var(--brass);outline-offset:2px}
+  #err{color:var(--pen);font-size:.85rem;min-height:1.2em}
+  #countdown{font-family:"Fraunces",serif;font-size:5rem;font-weight:700;color:var(--pen)}
+  .results{display:grid;grid-template-columns:repeat(2,minmax(90px,1fr));gap:.8rem 2rem}
+  .results .num{font-family:"Fraunces",serif;font-size:2rem;font-weight:700}
+  .results .lbl{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#7a7263}
+  .hidden{display:none}
+  footer{margin-top:.9rem;font-size:.75rem;color:#8a8272;max-width:640px;text-align:center}
+  @media (prefers-reduced-motion:reduce){ *{transition:none !important;animation:none !important} }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="clef">𝄞</span> Solfeo al Piano</h1>
+  <span class="tag">2 minutos · lectura a primera vista</span>
+</header>
+
+<div class="card">
+  <div id="timebar"><div id="timefill"></div></div>
+  <div class="hud">
+    <div class="stat"><div class="num" id="hits">0</div><div class="lbl">Aciertos</div></div>
+    <div class="stat"><div class="num" id="timeleft">2:00</div><div class="lbl">Tiempo</div></div>
+    <div class="stat"><div class="num" id="miss">0</div><div class="lbl">Errores</div></div>
+  </div>
+  <div id="staffwrap"></div>
+  <div id="feedback">
+    <div id="verdict"></div>
+    <div id="detected">Toca la nota escrita en tu piano…</div>
+  </div>
+
+  <!-- Pantalla inicial -->
+  <div class="overlay" id="startOverlay">
+    <h2>Lectura a primera vista</h2>
+    <p>Se mostrará una nota en el pentagrama; tócala en tu piano. El micrófono la identifica. Acierta tantas como puedas en 2 minutos.</p>
+    <div class="choices" role="group" aria-label="Clave">
+      <button class="choice" data-clef="treble" aria-pressed="true"><span class="clef">𝄞</span> Clave de sol</button>
+      <button class="choice" data-clef="bass" aria-pressed="false"><span class="clef">𝄢</span> Clave de fa</button>
+      <button class="choice" data-clef="both" aria-pressed="false"><span class="clef">𝄞𝄢</span> Ambas</button>
+    </div>
+    <label class="toggle"><input type="checkbox" id="octaveFree"> Ignorar la octava (más permisivo)</label>
+    <button class="btn" id="startBtn">Comenzar</button>
+    <div id="err" role="alert"></div>
+  </div>
+
+  <!-- Cuenta regresiva -->
+  <div class="overlay hidden" id="countOverlay"><div id="countdown">3</div></div>
+
+  <!-- Resultados -->
+  <div class="overlay hidden" id="endOverlay">
+    <h2>¡Tiempo!</h2>
+    <div class="results">
+      <div><div class="num" id="rHits" style="color:var(--ok)">0</div><div class="lbl">Aciertos</div></div>
+      <div><div class="num" id="rMiss" style="color:var(--pen)">0</div><div class="lbl">Errores</div></div>
+      <div><div class="num" id="rAcc">0%</div><div class="lbl">Precisión</div></div>
+      <div><div class="num" id="rStreak">0</div><div class="lbl">Mejor racha</div></div>
+    </div>
+    <button class="btn" id="againBtn">Jugar otra vez</button>
+  </div>
+</div>
+
+<footer>Usa el micrófono del dispositivo. Funciona con piano acústico o digital con bocinas. Ambiente silencioso = mejor detección.</footer>
+
+<script>
+"use strict";
+/* ---------- Teoría ---------- */
+const LETTERS = ["C","D","E","F","G","A","B"];
+const SEMIS   = {C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+const SOLFEO  = {C:"Do",D:"Re",E:"Mi",F:"Fa",G:"Sol",A:"La",B:"Si"};
+const dia = (letter,oct)=> oct*7 + LETTERS.indexOf(letter);
+const midiOf = (letter,oct)=> 12*(oct+1) + SEMIS[letter];
+const nameOfMidi = m=>{
+  const pc = ((m%12)+12)%12, oct = Math.floor(m/12)-1;
+  const names = ["Do","Do♯","Re","Re♯","Mi","Fa","Fa♯","Sol","Sol♯","La","La♯","Si"];
+  return names[pc] + oct;
+};
+
+/* Rangos por clave (solo naturales) */
+function buildRange(loL,loO,hiL,hiO){
+  const out=[]; for(let o=loO;o<=hiO;o++) for(const L of LETTERS){
+    const d=dia(L,o); if(d>=dia(loL,loO)&&d<=dia(hiL,hiO)) out.push({letter:L,oct:o});
+  } return out;
+}
+const RANGES = { treble: buildRange("C",4,"A",5), bass: buildRange("E",2,"C",4) };
+const CLEF_BASE = { treble: dia("E",4), bass: dia("G",2) }; // línea inferior
+
+/* ---------- Pentagrama SVG ---------- */
+const S=16, HALF=S/2, X0=24, X1=496, NOTE_X=310, BOT_Y=170;
+function yOf(d, clef){ return BOT_Y - (d - CLEF_BASE[clef]) * HALF; }
+
+function drawStaff(note, clef){
+  const parts=[`<svg viewBox="0 0 520 260" xmlns="http://www.w3.org/2000/svg" id="staff" aria-label="Pentagrama">`];
+  for(let i=0;i<5;i++){
+    const y=BOT_Y - i*S;
+    parts.push(`<line class="staffline" x1="${X0}" y1="${y}" x2="${X1}" y2="${y}"/>`);
+  }
+  // clave (Noto Music es SMuFL: font-size = altura del pentagrama, origen en su línea)
+  if(clef==="treble")
+    parts.push(`<text class="clefglyph" x="${X0+14}" y="${BOT_Y-S}" font-size="${4*S}">𝄞</text>`);
+  else
+    parts.push(`<text class="clefglyph" x="${X0+14}" y="${BOT_Y-3*S}" font-size="${4*S}">𝄢</text>`);
+
+  if(note){
+    const d=dia(note.letter,note.oct), y=yOf(d,clef);
+    // líneas adicionales
+    const bot=CLEF_BASE[clef], top=bot+8;
+    for(let ld=bot-2; ld>=d; ld-=2)
+      parts.push(`<line class="ledger" x1="${NOTE_X-17}" y1="${yOf(ld,clef)}" x2="${NOTE_X+17}" y2="${yOf(ld,clef)}"/>`);
+    for(let ld=top+2; ld<=d; ld+=2)
+      parts.push(`<line class="ledger" x1="${NOTE_X-17}" y1="${yOf(ld,clef)}" x2="${NOTE_X+17}" y2="${yOf(ld,clef)}"/>`);
+    // plica y cabeza
+    const mid=bot+4, up = d<mid;
+    const sx = up? NOTE_X+8.6 : NOTE_X-8.6, sy2 = up? y-3.4*S : y+3.4*S;
+    parts.push(`<line class="stem" x1="${sx}" y1="${y}" x2="${sx}" y2="${sy2}"/>`);
+    parts.push(`<ellipse class="notehead" cx="${NOTE_X}" cy="${y}" rx="9.4" ry="6.6" transform="rotate(-18 ${NOTE_X} ${y})"/>`);
+  }
+  parts.push(`</svg>`);
+  document.getElementById("staffwrap").innerHTML = parts.join("");
+}
+
+/* ---------- Detección de tono (autocorrelación) ---------- */
+function autoCorrelate(buf, sr){
+  const N=buf.length; let rms=0;
+  for(let i=0;i<N;i++) rms+=buf[i]*buf[i];
+  rms=Math.sqrt(rms/N);
+  if(rms<0.01) return -1;
+  let r1=0,r2=N-1;
+  for(let i=0;i<N/2;i++) if(Math.abs(buf[i])<0.2){r1=i;break;}
+  for(let i=1;i<N/2;i++) if(Math.abs(buf[N-i])<0.2){r2=N-i;break;}
+  const b=buf.slice(r1,r2), M=b.length;
+  const c=new Float32Array(M);
+  for(let i=0;i<M;i++){ let s=0; for(let j=0;j<M-i;j++) s+=b[j]*b[j+i]; c[i]=s; }
+  let d=0; while(d<M-1 && c[d]>c[d+1]) d++;
+  let maxv=-1,maxp=-1;
+  for(let i=d;i<M;i++) if(c[i]>maxv){maxv=c[i];maxp=i;}
+  if(maxp<=0) return -1;
+  let T=maxp;
+  const x1=c[T-1]||0,x2=c[T],x3=c[T+1]||0;
+  const a=(x1+x3-2*x2)/2, bb=(x3-x1)/2;
+  if(a) T=T-bb/(2*a);
+  return sr/T;
+}
+const midiFromFreq = f => Math.round(69 + 12*Math.log2(f/440));
+
+/* ---------- Juego ---------- */
+const GAME_LEN=120;
+const $=id=>document.getElementById(id);
+let clefMode="treble", octaveFree=false;
+let audioCtx=null, analyser=null, buf=null, stream=null;
+let running=false, endTime=0, raf=0;
+let target=null, targetClef="treble";
+let hits=0, misses=0, streak=0, bestStreak=0;
+let stableMidi=null, stableCount=0, lastJudged=null, cooldownUntil=0, sawSilence=true;
+
+document.querySelectorAll(".choice").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll(".choice").forEach(b=>b.setAttribute("aria-pressed","false"));
+    btn.setAttribute("aria-pressed","true");
+    clefMode=btn.dataset.clef;
+  });
+});
+
+function newTarget(){
+  targetClef = clefMode==="both" ? (Math.random()<.5?"treble":"bass") : clefMode;
+  const pool=RANGES[targetClef];
+  let n;
+  do{ n=pool[Math.floor(Math.random()*pool.length)]; }
+  while(target && n.letter===target.letter && n.oct===target.oct);
+  target=n;
+  drawStaff(target,targetClef);
+  $("verdict").textContent=""; $("verdict").className="";
+}
+
+function judge(midi){
+  const tMidi=midiOf(target.letter,target.oct);
+  const ok = octaveFree ? (midi%12)===(tMidi%12) : midi===tMidi;
+  const staff=$("staff");
+  staff.classList.remove("flash-ok","flash-bad");
+  if(ok){
+    hits++; streak++; bestStreak=Math.max(bestStreak,streak);
+    $("hits").textContent=hits;
+    $("verdict").textContent="✓ "+SOLFEO[target.letter]; $("verdict").className="ok";
+    staff.classList.add("flash-ok");
+    setTimeout(newTarget, 350);
+  }else{
+    misses++; streak=0;
+    $("miss").textContent=misses;
+    $("verdict").textContent="✗ Tocaste "+nameOfMidi(midi); $("verdict").className="bad";
+    staff.classList.add("flash-bad");
+  }
+  lastJudged=midi; sawSilence=false;
+  cooldownUntil=performance.now()+600;
+}
+
+function loop(){
+  if(!running) return;
+  const now=performance.now();
+  const remain=Math.max(0,(endTime-now)/1000);
+  const mm=Math.floor(remain/60), ss=Math.floor(remain%60);
+  $("timeleft").textContent=`${mm}:${String(ss).padStart(2,"0")}`;
+  $("timeleft").classList.toggle("low",remain<=10);
+  $("timefill").style.width=(remain/GAME_LEN*100)+"%";
+  if(remain<=0){ endGame(); return; }
+
+  analyser.getFloatTimeDomainData(buf);
+  const f=autoCorrelate(buf,audioCtx.sampleRate);
+  if(f>0 && f>60 && f<2200){
+    const m=midiFromFreq(f);
+    $("detected").textContent="Escuchando: "+nameOfMidi(m);
+    if(m===stableMidi) stableCount++; else {stableMidi=m; stableCount=1;}
+    const ready = now>=cooldownUntil && (sawSilence || m!==lastJudged);
+    if(stableCount>=4 && ready) judge(m);
+  }else{
+    $("detected").textContent="Escuchando…";
+    stableMidi=null; stableCount=0; sawSilence=true;
+  }
+  raf=requestAnimationFrame(loop);
+}
+
+async function startGame(){
+  $("err").textContent="";
+  octaveFree=$("octaveFree").checked;
+  try{
+    if(!stream){
+      stream=await navigator.mediaDevices.getUserMedia({audio:{
+        echoCancellation:false, noiseSuppression:false, autoGainControl:false }});
+      audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+      const src=audioCtx.createMediaStreamSource(stream);
+      analyser=audioCtx.createAnalyser();
+      analyser.fftSize=2048;
+      buf=new Float32Array(analyser.fftSize);
+      src.connect(analyser);
+    }
+    if(audioCtx.state==="suspended") await audioCtx.resume();
+  }catch(e){
+    $("err").textContent="No se pudo acceder al micrófono. Revisa los permisos del navegador.";
+    return;
+  }
+  $("startOverlay").classList.add("hidden");
+  // cuenta regresiva
+  const co=$("countOverlay"); co.classList.remove("hidden");
+  for(const n of [3,2,1]){
+    $("countdown").textContent=n;
+    await new Promise(r=>setTimeout(r,700));
+  }
+  co.classList.add("hidden");
+  hits=misses=streak=bestStreak=0;
+  $("hits").textContent="0"; $("miss").textContent="0";
+  lastJudged=null; sawSilence=true; cooldownUntil=0; target=null;
+  newTarget();
+  running=true;
+  endTime=performance.now()+GAME_LEN*1000;
+  raf=requestAnimationFrame(loop);
+}
+
+function endGame(){
+  running=false; cancelAnimationFrame(raf);
+  $("rHits").textContent=hits;
+  $("rMiss").textContent=misses;
+  const total=hits+misses;
+  $("rAcc").textContent=(total? Math.round(hits/total*100):0)+"%";
+  $("rStreak").textContent=bestStreak;
+  $("endOverlay").classList.remove("hidden");
+}
+
+$("startBtn").addEventListener("click",startGame);
+$("againBtn").addEventListener("click",()=>{
+  $("endOverlay").classList.add("hidden");
+  $("startOverlay").classList.remove("hidden");
+});
+
+drawStaff({letter:"G",oct:4},"treble"); // vista previa
+</script>
+</body>
+</html>
